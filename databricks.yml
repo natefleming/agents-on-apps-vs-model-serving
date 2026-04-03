@@ -1,0 +1,59 @@
+# Databricks Asset Bundle for Agent on Apps demo
+#
+# Deploys the same LangGraph agent via two paths:
+#   1. Model Serving (via notebook job)
+#   2. Databricks App (via notebook job + app resource)
+#
+# Uses the direct deployment engine (no Terraform dependency).
+#
+# Usage:
+#   databricks bundle validate -t dev
+#   databricks bundle deploy -t dev
+#   databricks bundle run deploy_model_serving -t dev
+#   databricks bundle run deploy_databricks_app -t dev
+#   databricks bundle run agent_app -t dev
+
+bundle:
+  name: agent-on-apps
+
+include:
+  - resources/*.yml
+
+variables:
+  catalog:
+    description: Unity Catalog catalog for model registration
+    default: main
+  schema:
+    description: Unity Catalog schema for model registration
+    default: nfleming_agent_on_apps
+  model_name:
+    description: Registered model name
+    default: demo_langgraph_agent
+  llm_endpoint:
+    description: Foundation Model API endpoint name
+    default: databricks-claude-haiku-4-5
+  app_name:
+    description: Databricks App name
+    default: nfleming-agent-on-apps
+
+targets:
+  dev:
+    default: true
+    mode: development
+    workspace:
+      profile: DEFAULT
+
+  staging:
+    workspace:
+      profile: DEFAULT
+    variables:
+      catalog: staging
+      schema: agents
+
+  prod:
+    mode: production
+    workspace:
+      profile: DEFAULT
+    variables:
+      catalog: prod
+      schema: agents

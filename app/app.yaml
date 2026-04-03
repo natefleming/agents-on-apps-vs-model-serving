@@ -1,0 +1,11 @@
+command:
+  - "python"
+  - "main.py"
+  - "--workers"
+  - "1"
+
+env:
+  - name: MLFLOW_EXPERIMENT_NAME
+    value: "/Workspace/Shared/demo-agent-app"
+  - name: LLM_ENDPOINT
+    value: "databricks-claude-haiku-4-5"

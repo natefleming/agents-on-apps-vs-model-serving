@@ -1,0 +1,33 @@
+# Job: Deploy LangGraph agent as a Databricks App
+#
+# Runs notebook 02 which:
+#   1. Creates the Databricks App (if not exists)
+#   2. Deploys app source code from app/ directory
+#   3. Configures app resources (serving endpoint access)
+#   4. Verifies the app is running
+#
+# The notebook uses serverless compute (no cluster config needed).
+
+resources:
+  jobs:
+    deploy_databricks_app:
+      name: "[${bundle.target}] Deploy Agent as Databricks App"
+      tasks:
+        - task_key: deploy_to_app
+          notebook_task:
+            notebook_path: ../notebooks/02_deploy_databricks_app.py
+            base_parameters:
+              app_name: ${var.app_name}-${bundle.target}
+              llm_endpoint: ${var.llm_endpoint}
+          # Serverless compute
+          environment_key: default
+      environments:
+        - environment_key: default
+          spec:
+            environment_version: "5"
+            dependencies:
+              - databricks-sdk>=0.102.0
+              - databricks-agents
+      tags:
+        project: agent-on-apps
+        deployment_path: databricks-app

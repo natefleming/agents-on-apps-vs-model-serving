@@ -1,0 +1,28 @@
+# Databricks App resource: LangGraph agent with AgentServer
+#
+# This deploys the app/ directory as a Databricks App.
+# The app uses mlflow.genai.agent_server.AgentServer to serve
+# the agent via /invocations with streaming support.
+#
+# Authentication:
+#   - OBO via X-Forwarded-Access-Token headers
+#   - App SP for system-level resources
+#
+# After deploying the bundle, start the app with:
+#   databricks bundle run agent_app -t dev
+
+resources:
+  apps:
+    agent_app:
+      name: ${var.app_name}-${bundle.target}
+      description: "LangGraph Agent Demo - AgentServer on Databricks Apps (${bundle.target})"
+      source_code_path: ../app
+
+      resources:
+        - name: llm-endpoint
+          serving_endpoint:
+            name: ${var.llm_endpoint}
+            permission: CAN_QUERY
+
+      user_api_scopes:
+        - serving.serving-endpoints

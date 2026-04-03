@@ -1,0 +1,1244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Deploying AI Agents on Databricks: Model Serving vs Apps</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,700;1,9..40,400&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --db-lava: #FF3621;
+      --db-lava-light: #FF5F46;
+      --db-navy: #1B3139;
+      --db-ink: #0B2026;
+      --db-teal: #1B5162;
+      --db-green: #00A972;
+      --db-oat: #F9F7F4;
+      --db-oat-medium: #EEEDE9;
+      --db-oat-dark: #DBD7CE;
+      --db-white: #FFFFFF;
+      --db-black: #000000;
+      --db-burgundy: #970F29;
+      --db-amber: #FEAB03;
+      --db-muted-teal: #618693;
+      --db-indigo: #4259FE;
+      --bg-primary: var(--db-oat);
+      --bg-dark: var(--db-navy);
+      --text-primary: var(--db-ink);
+      --text-secondary: #4A5E68;
+      --text-on-dark: var(--db-white);
+      --accent: var(--db-lava);
+      --divider: var(--db-oat-medium);
+      --font-display: 'DM Sans', sans-serif;
+      --font-body: 'DM Sans', sans-serif;
+      --font-mono: 'DM Mono', monospace;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html { scroll-behavior: auto; overflow-y: scroll; scroll-snap-type: y mandatory; }
+    body { font-family: var(--font-body); background: var(--bg-primary); color: var(--text-primary); overflow-x: hidden; }
+
+    /* Slide base */
+    .slide { height: 100vh; height: 100dvh; scroll-snap-align: start; padding: clamp(2rem, 5vw, 4rem); display: flex; flex-direction: column; justify-content: center; align-items: center; position: relative; opacity: 1; overflow-y: auto; }
+    .slide-content { width: 100%; max-width: 1100px; margin: 0 auto; }
+
+    /* Slide themes */
+    .slide-dark { background: var(--db-navy); color: var(--db-white); }
+    .slide-light { background: var(--db-oat); color: var(--db-ink); }
+    .slide-white { background: var(--db-white); color: var(--db-ink); }
+    .slide-ink { background: var(--db-ink); color: var(--db-white); }
+    .slide-teal { background: var(--db-teal); color: var(--db-white); }
+
+    /* Typography */
+    h1 { font-family: var(--font-display); font-weight: 700; font-size: clamp(2.5rem, 5vw, 4.5rem); letter-spacing: -0.02em; line-height: 1.1; }
+    h2 { font-family: var(--font-display); font-weight: 700; font-size: clamp(1.8rem, 3.5vw, 3rem); letter-spacing: -0.01em; line-height: 1.2; }
+    h3 { font-family: var(--font-display); font-weight: 500; font-size: clamp(1.2rem, 2vw, 1.5rem); line-height: 1.3; }
+    p, li { font-family: var(--font-body); font-weight: 400; font-size: clamp(1rem, 1.5vw, 1.25rem); line-height: 1.6; }
+    code, .mono { font-family: var(--font-mono); font-weight: 400; font-size: 0.9em; }
+
+    /* Logo */
+    .db-logo { height: 28px; width: auto; }
+    .title-slide .db-logo { height: 36px; }
+
+    /* Progress bar */
+    .progress-bar { position: fixed; top: 0; left: 0; height: 3px; background: var(--accent); z-index: 100; transition: width 0.3s ease; }
+
+    /* Nav dots */
+    .nav-dots { position: fixed; right: 1.5rem; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; gap: 8px; z-index: 100; }
+    .nav-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--db-oat-medium); border: none; cursor: pointer; transition: all 0.3s ease; padding: 0; }
+    .nav-dot.active { background: var(--accent); transform: scale(1.4); }
+
+    /* Accent line */
+    .accent-line { width: 60px; height: 4px; background: var(--db-lava); border-radius: 2px; margin: 1rem 0; }
+
+    /* Section label */
+    .section-label { font-family: var(--font-mono); font-size: 0.75rem; letter-spacing: 0.15em; text-transform: uppercase; color: var(--db-lava); margin-bottom: 0.75rem; font-weight: 500; }
+    .slide-dark .section-label, .slide-ink .section-label, .slide-teal .section-label { color: var(--db-lava-light); }
+
+    /* Card grid */
+    .card-grid { display: grid; gap: 1.25rem; margin: 1.5rem 0; }
+    .card-grid-2 { grid-template-columns: 1fr 1fr; }
+    .card-grid-3 { grid-template-columns: 1fr 1fr 1fr; }
+    .card-grid-4 { grid-template-columns: 1fr 1fr 1fr 1fr; }
+    .card { padding: 1.5rem; border-radius: 12px; background: var(--db-white); border: 1px solid var(--db-oat-medium); }
+    .slide-dark .card, .slide-ink .card, .slide-teal .card { background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.12); }
+    .slide-dark .card h3, .slide-dark .card p, .slide-dark .card li,
+    .slide-ink .card h3, .slide-ink .card p, .slide-ink .card li,
+    .slide-teal .card h3, .slide-teal .card p, .slide-teal .card li { color: white; }
+    .slide-dark .card .text-muted, .slide-ink .card .text-muted { color: rgba(255,255,255,0.6); }
+    .card-icon { font-size: 1.8rem; margin-bottom: 0.75rem; }
+
+    /* Two column */
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 3rem; align-items: start; margin: 1.5rem 0; }
+
+    /* Comparison grid */
+    .comparison-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; max-width: 1000px; margin: 1.5rem auto; }
+    .comparison-card { padding: 2rem; border-radius: 12px; }
+    .comparison-card.left { background: rgba(27, 81, 98, 0.08); border: 1px solid rgba(27, 81, 98, 0.2); }
+    .comparison-card.right { background: rgba(0, 169, 114, 0.08); border: 1px solid rgba(0, 169, 114, 0.2); }
+    .slide-dark .comparison-card.left { background: rgba(27, 81, 98, 0.25); border-color: rgba(27, 81, 98, 0.5); }
+    .slide-dark .comparison-card.right { background: rgba(0, 169, 114, 0.15); border-color: rgba(0, 169, 114, 0.4); }
+
+    /* Diagram */
+    .diagram { display: flex; flex-direction: column; align-items: center; gap: 1rem; max-width: 900px; margin: 1.5rem auto; }
+    .diagram-row { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; justify-content: center; }
+    .diagram-node { padding: 0.85rem 1.25rem; border-radius: 10px; font-family: var(--font-body); font-weight: 500; font-size: 0.9rem; text-align: center; min-width: 130px; transition: transform 0.3s ease, box-shadow 0.3s ease; }
+    .diagram-node:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.15); }
+    .diagram-node.primary { background: var(--db-lava); color: white; }
+    .diagram-node.secondary { background: var(--db-navy); color: white; }
+    .diagram-node.accent { background: var(--db-teal); color: white; }
+    .diagram-node.green { background: var(--db-green); color: white; }
+    .diagram-node.amber { background: var(--db-amber); color: var(--db-ink); }
+    .diagram-node.indigo { background: var(--db-indigo); color: white; }
+    .diagram-node.outline { background: transparent; border: 2px solid var(--db-oat-dark); color: var(--db-ink); }
+    .slide-dark .diagram-node.outline { border-color: rgba(255,255,255,0.3); color: white; }
+    .diagram-arrow { font-size: 1.5rem; color: var(--db-oat-dark); font-family: var(--font-body); line-height: 1; }
+    .slide-dark .diagram-arrow { color: rgba(255,255,255,0.4); }
+    .diagram-connector { width: 2px; height: 1.5rem; background: var(--db-oat-dark); position: relative; }
+    .diagram-connector::after { content: '\25BC'; position: absolute; bottom: -0.6rem; left: 50%; transform: translateX(-50%); font-size: 0.6rem; color: var(--db-oat-dark); }
+    .slide-dark .diagram-connector { background: rgba(255,255,255,0.3); }
+    .slide-dark .diagram-connector::after { color: rgba(255,255,255,0.4); }
+
+    /* Table */
+    .data-table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; font-size: 0.95rem; }
+    .data-table th { font-weight: 700; text-align: left; padding: 0.75rem 1rem; border-bottom: 2px solid var(--db-oat-dark); }
+    .data-table td { padding: 0.6rem 1rem; border-bottom: 1px solid var(--db-oat-medium); }
+    .data-table .col-feature { width: 25%; font-weight: 500; }
+    .slide-dark .data-table th { border-bottom-color: rgba(255,255,255,0.2); color: white; }
+    .slide-dark .data-table td { border-bottom-color: rgba(255,255,255,0.08); color: rgba(255,255,255,0.85); }
+    .data-table .highlight { color: var(--db-lava); font-weight: 600; }
+    .data-table .green-text { color: var(--db-green); font-weight: 500; }
+
+    /* Code block */
+    .code-block { background: var(--db-ink); border-radius: 10px; padding: 1.25rem 1.5rem; font-family: var(--font-mono); font-size: 0.8rem; color: #e4e4e4; overflow-x: auto; line-height: 1.6; margin: 1rem 0; white-space: pre; }
+    .code-block .keyword { color: var(--db-indigo); }
+    .code-block .string { color: var(--db-green); }
+    .code-block .comment { color: var(--db-muted-teal); }
+    .code-block .func { color: var(--db-amber); }
+
+    /* Badge / tag */
+    .badge { display: inline-block; font-family: var(--font-mono); font-size: 0.7rem; padding: 0.2rem 0.6rem; border-radius: 4px; font-weight: 500; letter-spacing: 0.05em; }
+    .badge-lava { background: rgba(255,54,33,0.12); color: var(--db-lava); }
+    .badge-green { background: rgba(0,169,114,0.12); color: var(--db-green); }
+    .badge-teal { background: rgba(27,81,98,0.12); color: var(--db-teal); }
+    .badge-amber { background: rgba(254,171,3,0.15); color: #b87a00; }
+    .slide-dark .badge-lava { background: rgba(255,54,33,0.2); color: #ff7b6b; }
+    .slide-dark .badge-green { background: rgba(0,169,114,0.2); color: #5cd6a8; }
+    .slide-dark .badge-teal { background: rgba(27,81,98,0.25); color: #7ec8dc; }
+
+    /* Icon circle */
+    .icon-circle { width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; flex-shrink: 0; }
+    .icon-circle.lava { background: rgba(255,54,33,0.12); }
+    .icon-circle.green { background: rgba(0,169,114,0.12); }
+    .icon-circle.teal { background: rgba(27,81,98,0.12); }
+    .icon-circle.indigo { background: rgba(66,89,254,0.12); }
+    .icon-circle.amber { background: rgba(254,171,3,0.15); }
+    .slide-dark .icon-circle.lava { background: rgba(255,54,33,0.2); }
+    .slide-dark .icon-circle.green { background: rgba(0,169,114,0.2); }
+    .slide-dark .icon-circle.teal { background: rgba(27,81,98,0.3); }
+
+    /* Reveal items */
+    .reveal-stack { display: flex; flex-direction: column; gap: 1rem; max-width: 700px; margin: 1.5rem auto; }
+    .reveal-item { padding: 1.25rem 1.5rem; border-radius: 10px; background: var(--db-white); border: 1px solid var(--db-oat-medium); display: flex; align-items: center; gap: 1rem; }
+    .slide-dark .reveal-item { background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.1); }
+
+    /* Bullet list styled */
+    .bullet-list { list-style: none; padding: 0; }
+    .bullet-list li { padding: 0.4rem 0; padding-left: 1.5rem; position: relative; }
+    .bullet-list li::before { content: ''; position: absolute; left: 0; top: 0.75rem; width: 8px; height: 8px; border-radius: 2px; background: var(--db-lava); }
+    .slide-dark .bullet-list li::before { background: var(--db-lava-light); }
+
+    /* Subtitle */
+    .subtitle { font-size: clamp(1.1rem, 2vw, 1.4rem); color: var(--text-secondary); margin-top: 0.75rem; font-weight: 400; line-height: 1.5; }
+    .slide-dark .subtitle { color: rgba(255,255,255,0.65); }
+
+    /* Slide number */
+    .slide-num { position: absolute; bottom: 1.5rem; right: 2rem; font-family: var(--font-mono); font-size: 0.7rem; color: var(--db-oat-dark); letter-spacing: 0.05em; }
+    .slide-dark .slide-num, .slide-ink .slide-num, .slide-teal .slide-num { color: rgba(255,255,255,0.25); }
+
+    /* Counters */
+    .counter-group { display: flex; gap: 3rem; justify-content: center; flex-wrap: wrap; margin: 2rem 0; }
+    .counter-item { text-align: center; }
+    .counter-value { font-family: var(--font-display); font-weight: 700; font-size: clamp(3rem, 8vw, 5rem); line-height: 1; color: var(--db-lava); }
+    .counter-label { font-family: var(--font-body); font-size: 1rem; color: var(--text-secondary); margin-top: 0.5rem; }
+    .slide-dark .counter-label { color: rgba(255,255,255,0.6); }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .nav-dots { display: none; }
+      .slide { padding: 1.5rem; }
+      .two-col, .comparison-grid, .card-grid-2, .card-grid-3, .card-grid-4 { grid-template-columns: 1fr; }
+      .diagram-row { flex-direction: column; }
+    }
+    @media (prefers-reduced-motion: reduce) { .float, .pulse-glow { animation: none; } }
+  </style>
+</head>
+<body>
+  <div class="progress-bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+  <nav class="nav-dots" aria-label="Slide navigation"></nav>
+
+  <!-- SLIDE 1: Title -->
+  <section class="slide slide-dark title-slide" aria-label="Slide 1: Title">
+    <div class="slide-content" style="text-align: center;">
+      <div style="margin-bottom: 2rem;">
+        <svg class="db-logo" viewBox="0 0 713 113" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Databricks">
+        <g clip-path="url(#clip0_dark)">
+        <path d="M98.9 46.5996L52.3 72.8996L2.4 44.7996L0 46.0996V66.4996L52.3 95.8996L98.9 69.6996V80.4996L52.3 106.8L2.4 78.6996L0 79.9996V83.4996L52.3 112.9L104.5 83.4996V63.0996L102.1 61.7996L52.3 89.7996L5.6 63.5996V52.7996L52.3 78.9996L104.5 49.5996V29.4996L101.9 27.9996L52.3 55.8996L8 31.0996L52.3 6.19961L88.7 26.6996L91.9 24.8996V22.3996L52.3 0.0996094L0 29.4996V32.6996L52.3 62.0996L98.9 35.7996V46.5996Z" fill="#FF3621"/>
+        <path d="M202.2 96.1994V6.39941H188.4V39.9994C188.4 40.4994 188.1 40.8994 187.6 41.0994C187.1 41.2994 186.6 41.0994 186.3 40.7994C181.6 35.2994 174.3 32.1994 166.3 32.1994C149.2 32.1994 135.8 46.5994 135.8 64.9994C135.8 73.9994 138.9 82.2994 144.6 88.3994C150.3 94.4994 158 97.7994 166.3 97.7994C174.2 97.7994 181.5 94.4994 186.3 88.7994C186.6 88.3994 187.2 88.2994 187.6 88.3994C188.1 88.5994 188.4 88.9994 188.4 89.4994V96.1994H202.2ZM169.3 85.2994C158.3 85.2994 149.7 76.3994 149.7 64.9994C149.7 53.5994 158.3 44.6994 169.3 44.6994C180.3 44.6994 188.9 53.5994 188.9 64.9994C188.9 76.3994 180.3 85.2994 169.3 85.2994Z" fill="white"/>
+        <path d="M276 96.0996V33.6996H262.3V39.9996C262.3 40.4996 262 40.8996 261.5 41.0996C261 41.2996 260.5 41.0996 260.2 40.6996C255.6 35.1996 248.4 32.0996 240.2 32.0996C223.1 32.0996 209.7 46.4996 209.7 64.8996C209.7 83.2996 223.1 97.6996 240.2 97.6996C248.1 97.6996 255.4 94.3996 260.2 88.5996C260.5 88.1996 261.1 88.0996 261.5 88.1996C262 88.3996 262.3 88.7996 262.3 89.2996V96.0996H276ZM243.3 85.2996C232.3 85.2996 223.7 76.3996 223.7 64.9996C223.7 53.5996 232.3 44.6996 243.3 44.6996C254.3 44.6996 262.9 53.5996 262.9 64.9996C262.9 76.3996 254.3 85.2996 243.3 85.2996Z" fill="white"/>
+        <path d="M314.4 97.1994C318.8 97.1994 322.7 96.7994 324.9 96.4994V84.4994C323.1 84.6994 319.9 84.8994 318 84.8994C312.4 84.8994 308.1 83.8994 308.1 71.7994V46.0994C308.1 45.3994 308.6 44.8994 309.3 44.8994H322.8V33.5994H309.3C308.6 33.5994 308.1 33.0994 308.1 32.3994V14.3994H294.3V32.4994C294.3 33.1994 293.8 33.6994 293.1 33.6994H283.5V44.9994H293.1C293.8 44.9994 294.3 45.4994 294.3 46.1994V75.2994C294.3 97.1994 308.9 97.1994 314.4 97.1994Z" fill="white"/>
+        <path d="M393.3 96.1996V33.6996H379.6V39.9996C379.6 40.4996 379.3 40.8996 378.8 41.0996C378.3 41.2996 377.8 41.0996 377.5 40.6996C372.9 35.1996 365.7 32.0996 357.5 32.0996C340.3 32.0996 327 46.4996 327 64.9996C327 83.4996 340.4 97.7996 357.5 97.7996C365.4 97.7996 372.7 94.4996 377.5 88.6996C377.8 88.2996 378.4 88.1996 378.8 88.2996C379.3 88.4996 379.6 88.8996 379.6 89.3996V96.1996H393.3ZM360.6 85.2996C349.6 85.2996 341 76.3996 341 64.9996C341 53.5996 349.6 44.6996 360.6 44.6996C371.6 44.6996 380.2 53.5996 380.2 64.9996C380.2 76.3996 371.6 85.2996 360.6 85.2996Z" fill="white"/>
+        <path d="M418.4 88.7994C418.5 88.7994 418.7 88.6994 418.8 88.6994C419.1 88.6994 419.5 88.8994 419.7 89.0994C424.4 94.5994 431.7 97.6994 439.7 97.6994C456.8 97.6994 470.2 83.2994 470.2 64.8994C470.2 55.8994 467.1 47.5994 461.4 41.4994C455.7 35.3994 448 32.0994 439.7 32.0994C431.8 32.0994 424.5 35.3994 419.7 41.0994C419.4 41.4994 418.9 41.5994 418.4 41.4994C417.9 41.2994 417.6 40.8994 417.6 40.3994V6.39941H403.8V96.1994H417.6V89.8994C417.6 89.3994 417.9 88.9994 418.4 88.7994ZM417 64.9994C417 53.5994 425.6 44.6994 436.6 44.6994C447.6 44.6994 456.2 53.5994 456.2 64.9994C456.2 76.3994 447.6 85.2994 436.6 85.2994C425.6 85.2994 417 76.2994 417 64.9994Z" fill="white"/>
+        <path d="M510.1 46.4994C511.4 46.4994 512.6 46.5994 513.4 46.7994V32.5994C512.9 32.4994 512 32.3994 511.1 32.3994C503.9 32.3994 497.3 36.0994 493.8 41.9994C493.5 42.4994 493 42.6994 492.5 42.4994C492 42.3994 491.6 41.8994 491.6 41.3994V33.6994H477.9V96.2994H491.7V68.6994C491.7 54.9994 498.7 46.4994 510.1 46.4994Z" fill="white"/>
+        <path d="M536.1 33.6992H522.1V96.2992H536.1V33.6992Z" fill="white"/>
+        <path d="M528.9 6.49902C524.2 6.49902 520.4 10.299 520.4 14.999C520.4 19.699 524.2 23.499 528.9 23.499C533.6 23.499 537.4 19.699 537.4 14.999C537.4 10.299 533.6 6.49902 528.9 6.49902Z" fill="white"/>
+        <path d="M577.1 32.0996C557.9 32.0996 544 45.8996 544 64.9996C544 74.2996 547.3 82.5996 553.2 88.5996C559.2 94.5996 567.6 97.8996 577 97.8996C584.8 97.8996 590.8 96.3996 602.2 87.9996L594.3 79.6996C588.7 83.3996 583.5 85.1996 578.4 85.1996C566.8 85.1996 558.1 76.4996 558.1 64.9996C558.1 53.4996 566.8 44.7996 578.4 44.7996C583.9 44.7996 589 46.5996 594.1 50.2996L602.9 41.9996C592.6 33.1996 583.3 32.0996 577.1 32.0996Z" fill="white"/>
+        <path d="M626.5 68.699C626.7 68.499 627 68.399 627.3 68.399H627.4C627.7 68.399 628 68.599 628.3 68.799L650.4 96.199H667.4L638.8 61.599C638.4 61.099 638.4 60.399 638.9 59.999L665.2 33.699H648.3L625.6 56.499C625.3 56.799 624.8 56.899 624.3 56.799C623.9 56.599 623.6 56.199 623.6 55.699V6.49902H609.7V96.299H623.5V71.899C623.5 71.599 623.6 71.199 623.9 70.999L626.5 68.699Z" fill="white"/>
+        <path d="M689.9 97.799C701.2 97.799 712.7 90.899 712.7 77.799C712.7 69.199 707.3 63.299 696.3 59.699L688.8 57.199C683.7 55.499 681.3 53.099 681.3 49.799C681.3 45.999 684.7 43.399 689.5 43.399C694.1 43.399 698.2 46.399 700.8 51.599L711.9 45.599C707.8 37.199 699.3 31.999 689.5 31.999C677.1 31.999 668.1 39.999 668.1 50.899C668.1 59.599 673.3 65.399 684 68.799L691.7 71.299C697.1 72.999 699.4 75.199 699.4 78.699C699.4 83.999 694.5 85.899 690.3 85.899C684.7 85.899 679.7 82.299 677.3 76.399L666 82.399C669.7 91.899 678.8 97.799 689.9 97.799Z" fill="white"/>
+        </g>
+        <defs><clipPath id="clip0_dark"><rect width="712.8" height="113" fill="white"/></clipPath></defs>
+        </svg>
+      </div>
+      <h1 style="margin-bottom: 1rem;">Deploying AI Agents on Databricks</h1>
+      <div class="accent-line" style="margin: 1rem auto;"></div>
+      <p class="subtitle" style="max-width: 700px; margin: 0 auto;">Model Serving vs Databricks Apps<br><span style="font-size: 0.9em; color: rgba(255,255,255,0.45);">Two paths, one platform, same agent</span></p>
+    </div>
+    <span class="slide-num">01 / 19</span>
+  </section>
+
+  <!-- SLIDE 2: Agenda -->
+  <section class="slide slide-light" aria-label="Slide 2: Agenda">
+    <div class="slide-content">
+      <p class="section-label">Overview</p>
+      <h2 style="margin-bottom: 1.5rem;">What We'll Cover</h2>
+      <div class="card-grid card-grid-4" style="gap: 1rem;">
+        <div class="card" style="padding: 1.1rem;">
+          <div class="card-icon" style="font-size: 1.4rem; margin-bottom: 0.5rem;">&#x1F916;</div>
+          <h3 style="font-size: 0.95rem;">The Demo Agent</h3>
+          <p style="font-size: 0.78rem; color: var(--text-secondary);">LangGraph ReAct architecture</p>
+        </div>
+        <div class="card" style="padding: 1.1rem;">
+          <div class="card-icon" style="font-size: 1.4rem; margin-bottom: 0.5rem;">&#x1F4E8;</div>
+          <h3 style="font-size: 0.95rem;">Responses API</h3>
+          <p style="font-size: 0.78rem; color: var(--text-secondary);">Request + response format</p>
+        </div>
+        <div class="card" style="padding: 1.1rem;">
+          <div class="card-icon" style="font-size: 1.4rem; margin-bottom: 0.5rem;">&#x2601;</div>
+          <h3 style="font-size: 0.95rem;">Model Serving</h3>
+          <p style="font-size: 0.78rem; color: var(--text-secondary);">ResponsesAgent code + deploy</p>
+        </div>
+        <div class="card" style="padding: 1.1rem;">
+          <div class="card-icon" style="font-size: 1.4rem; margin-bottom: 0.5rem;">&#x1F4E6;</div>
+          <h3 style="font-size: 0.95rem;">Databricks Apps</h3>
+          <p style="font-size: 0.78rem; color: var(--text-secondary);">AgentServer code + deploy</p>
+        </div>
+        <div class="card" style="padding: 1.1rem;">
+          <div class="card-icon" style="font-size: 1.4rem; margin-bottom: 0.5rem;">&#x1F512;</div>
+          <h3 style="font-size: 0.95rem;">Auth: Serving</h3>
+          <p style="font-size: 0.78rem; color: var(--text-secondary);">SP + OBO policies</p>
+        </div>
+        <div class="card" style="padding: 1.1rem;">
+          <div class="card-icon" style="font-size: 1.4rem; margin-bottom: 0.5rem;">&#x1F511;</div>
+          <h3 style="font-size: 0.95rem;">Auth: Apps</h3>
+          <p style="font-size: 0.78rem; color: var(--text-secondary);">X-Forwarded + scopes</p>
+        </div>
+        <div class="card" style="padding: 1.1rem;">
+          <div class="card-icon" style="font-size: 1.4rem; margin-bottom: 0.5rem;">&#x1F30A;</div>
+          <h3 style="font-size: 0.95rem;">Streaming</h3>
+          <p style="font-size: 0.78rem; color: var(--text-secondary);">Side-by-side deep dive</p>
+        </div>
+        <div class="card" style="padding: 1.1rem;">
+          <div class="card-icon" style="font-size: 1.4rem; margin-bottom: 0.5rem;">&#x1F50D;</div>
+          <h3 style="font-size: 0.95rem;">MLflow Tracing</h3>
+          <p style="font-size: 0.78rem; color: var(--text-secondary);">Auto vs manual + UC storage</p>
+        </div>
+        <div class="card" style="padding: 1.1rem;">
+          <div class="card-icon" style="font-size: 1.4rem; margin-bottom: 0.5rem;">&#x2696;</div>
+          <h3 style="font-size: 0.95rem;">Comparison</h3>
+          <p style="font-size: 0.78rem; color: var(--text-secondary);">Head-to-head table</p>
+        </div>
+        <div class="card" style="padding: 1.1rem;">
+          <div class="card-icon" style="font-size: 1.4rem; margin-bottom: 0.5rem;">&#x1F9ED;</div>
+          <h3 style="font-size: 0.95rem;">When to Use</h3>
+          <p style="font-size: 0.78rem; color: var(--text-secondary);">Decision guide</p>
+        </div>
+        <div class="card" style="padding: 1.1rem;">
+          <div class="card-icon" style="font-size: 1.4rem; margin-bottom: 0.5rem;">&#x1F500;</div>
+          <h3 style="font-size: 0.95rem;">Hybrid Architecture</h3>
+          <p style="font-size: 0.78rem; color: var(--text-secondary);">Best of both worlds</p>
+        </div>
+        <div class="card" style="padding: 1.1rem;">
+          <div class="card-icon" style="font-size: 1.4rem; margin-bottom: 0.5rem;">&#x1F680;</div>
+          <h3 style="font-size: 0.95rem;">Future + Demo + Q&amp;A</h3>
+          <p style="font-size: 0.78rem; color: var(--text-secondary);">Roadmap, live code, discussion</p>
+        </div>
+      </div>
+    </div>
+    <span class="slide-num">02 / 19</span>
+  </section>
+
+  <!-- SLIDE 3: The Demo Agent -->
+  <section class="slide slide-white" aria-label="Slide 3: The Demo Agent">
+    <div class="slide-content">
+      <p class="section-label">Architecture</p>
+      <h2 style="margin-bottom: 1.5rem;">The Demo Agent</h2>
+      <div class="two-col">
+        <div>
+          <p style="margin-bottom: 1rem;">A <strong>LangGraph ReAct agent</strong> implementing the <span class="badge badge-lava">ResponsesAgent</span> interface (Responses API format).</p>
+          <ul class="bullet-list">
+            <li><strong>LLM:</strong> ChatDatabricks (Claude Sonnet 4.6 via FMAPI)</li>
+            <li><strong>Tool 1:</strong> Product catalog lookup</li>
+            <li><strong>Tool 2:</strong> Math calculator</li>
+            <li><strong>Model Serving:</strong> <code>mlflow.pyfunc.ResponsesAgent</code></li>
+            <li><strong>Apps:</strong> <code>mlflow.genai.agent_server.AgentServer</code></li>
+            <li><strong>Streaming:</strong> Both paths support streaming natively</li>
+          </ul>
+          <div style="margin-top: 1rem; padding: 0.75rem 1rem; background: rgba(255,54,33,0.06); border-left: 3px solid var(--db-lava); border-radius: 0 6px 6px 0;">
+            <p style="font-size: 0.85rem; color: var(--text-secondary);"><strong style="color: var(--db-lava);">Models-from-code:</strong> No pickle, just source. MLflow logs the Python file directly — deterministic, auditable, reproducible.</p>
+          </div>
+          <p style="margin-top: 1rem; font-size: 0.9rem; color: var(--text-secondary);"><strong>Same LangGraph agent</strong> powers both paths. Only the serving wrapper differs.</p>
+        </div>
+        <div class="diagram">
+          <div class="diagram-node primary" style="min-width: 200px;">User Message</div>
+          <div class="diagram-connector"></div>
+          <div class="diagram-node secondary" style="min-width: 200px;">ResponsesAgent / AgentServer</div>
+          <div class="diagram-connector"></div>
+          <div class="diagram-row">
+            <div class="diagram-node accent">Agent Node<br><span style="font-size: 0.75rem; opacity: 0.8;">ChatDatabricks LLM</span></div>
+            <div class="diagram-arrow">&#x21C4;</div>
+            <div class="diagram-node green">Tool Node<br><span style="font-size: 0.75rem; opacity: 0.8;">lookup / calc</span></div>
+          </div>
+          <div class="diagram-connector"></div>
+          <div class="diagram-node primary" style="min-width: 200px;">Agent Response</div>
+        </div>
+      </div>
+    </div>
+    <span class="slide-num">03 / 19</span>
+  </section>
+
+  <!-- SLIDE 4: Responses API Format -->
+  <section class="slide slide-ink" aria-label="Slide 4: Responses API Format">
+    <div class="slide-content">
+      <p class="section-label">API Contract</p>
+      <h2 style="margin-bottom: 0.5rem;">Responses API Format</h2>
+      <p class="subtitle" style="margin-bottom: 1.25rem;">The SAME request/response format for both Model Serving and Apps</p>
+      <div class="two-col" style="gap: 2rem;">
+        <div>
+          <h3 style="color: #7ec8dc; margin-bottom: 0.75rem;">Request <span class="badge badge-teal">ResponsesAgentRequest</span></h3>
+          <div class="code-block" style="font-size: 0.72rem;">
+<span class="comment"># Standard invoke request</span>
+{
+  <span class="string">"input"</span>: [
+    {<span class="string">"role"</span>: <span class="string">"user"</span>,
+     <span class="string">"content"</span>: <span class="string">"What products match 'drill'?"</span>}
+  ]
+}
+
+<span class="comment"># Streaming request — add stream: true</span>
+{
+  <span class="string">"input"</span>: [
+    {<span class="string">"role"</span>: <span class="string">"user"</span>,
+     <span class="string">"content"</span>: <span class="string">"What products match 'drill'?"</span>}
+  ],
+  <span class="string">"stream"</span>: <span class="keyword">true</span>
+}
+
+<span class="comment"># Multi-turn: include prior assistant turns</span>
+{
+  <span class="string">"input"</span>: [
+    {<span class="string">"role"</span>: <span class="string">"user"</span>, <span class="string">"content"</span>: <span class="string">"Find drills"</span>},
+    {<span class="string">"type"</span>: <span class="string">"message"</span>, <span class="string">"role"</span>: <span class="string">"assistant"</span>,
+     <span class="string">"content"</span>: [{<span class="string">"type"</span>: <span class="string">"output_text"</span>, ...}]},
+    {<span class="string">"role"</span>: <span class="string">"user"</span>, <span class="string">"content"</span>: <span class="string">"How much?"</span>}
+  ]
+}</div>
+        </div>
+        <div>
+          <h3 style="color: #5cd6a8; margin-bottom: 0.75rem;">Response <span class="badge badge-green">ResponsesAgentResponse</span></h3>
+          <div class="code-block" style="font-size: 0.72rem;">
+<span class="comment"># Invoke response — output array</span>
+{
+  <span class="string">"output"</span>: [
+    {
+      <span class="string">"type"</span>: <span class="string">"message"</span>,
+      <span class="string">"role"</span>: <span class="string">"assistant"</span>,
+      <span class="string">"content"</span>: [
+        {<span class="string">"type"</span>: <span class="string">"output_text"</span>,
+         <span class="string">"text"</span>: <span class="string">"Found 3 drills..."</span>}
+      ]
+    }
+  ]
+}
+
+<span class="comment"># Stream response — SSE events</span>
+<span class="comment"># event: response.output_item.added</span>
+<span class="comment"># data: {"type": "message", ...}</span>
+<span class="comment"># event: response.output_text.delta</span>
+<span class="comment"># data: {"delta": "Found 3..."}</span>
+<span class="comment"># event: response.output_item.done</span>
+<span class="comment"># data: {"type": "message", ...}</span>
+<span class="comment"># event: response.completed</span></div>
+        </div>
+      </div>
+      <div style="text-align: center; margin-top: 1rem;">
+        <p style="font-size: 0.85rem; color: rgba(255,255,255,0.5);">Both <code style="color: rgba(255,255,255,0.7);">/serving-endpoints/{ep}/invocations</code> and <code style="color: rgba(255,255,255,0.7);">/apps/{app}/invocations</code> accept this identical format</p>
+      </div>
+    </div>
+    <span class="slide-num">04 / 19</span>
+  </section>
+
+  <!-- SLIDE 5: Model Serving: ResponsesAgent -->
+  <section class="slide slide-dark" aria-label="Slide 5: Model Serving ResponsesAgent">
+    <div class="slide-content">
+      <p class="section-label">Deployment Path 1</p>
+      <h2 style="margin-bottom: 0.5rem;">Model Serving: ResponsesAgent</h2>
+      <p class="subtitle" style="margin-bottom: 1.5rem;">Managed inference with predict + predict_stream</p>
+      <div class="two-col">
+        <div>
+          <div class="code-block" style="font-size: 0.72rem;">
+<span class="comment"># src/agent.py — ResponsesAgent with streaming</span>
+<span class="keyword">from</span> mlflow.pyfunc <span class="keyword">import</span> <span class="func">ResponsesAgent</span>
+<span class="keyword">from</span> mlflow.types.responses <span class="keyword">import</span> (
+    ResponsesAgentRequest, ResponsesAgentResponse,
+    ResponsesAgentStreamEvent,
+    output_to_responses_items_stream,
+    to_chat_completions_input,
+)
+
+<span class="keyword">class</span> <span class="func">LangGraphResponsesAgent</span>(ResponsesAgent):
+    <span class="keyword">def</span> <span class="func">predict</span>(self, request):
+        outputs = [e.item <span class="keyword">for</span> e <span class="keyword">in</span>
+            self.predict_stream(request)
+            <span class="keyword">if</span> e.type == <span class="string">"response.output_item.done"</span>]
+        <span class="keyword">return</span> ResponsesAgentResponse(output=outputs)
+
+    <span class="keyword">def</span> <span class="func">predict_stream</span>(self, request):
+        msgs = to_chat_completions_input(
+            [i.model_dump() <span class="keyword">for</span> i <span class="keyword">in</span> request.input])
+        <span class="keyword">for</span> _, events <span class="keyword">in</span> self.graph.stream(
+            {<span class="string">"messages"</span>: msgs}, stream_mode=[<span class="string">"updates"</span>]):
+            <span class="keyword">for</span> data <span class="keyword">in</span> events.values():
+                <span class="keyword">yield from</span> output_to_responses_items_stream(
+                    data[<span class="string">"messages"</span>])</div>
+        </div>
+        <div>
+          <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+            <div class="reveal-item" style="background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.1);">
+              <div class="icon-circle lava">&#x1F4E6;</div>
+              <div>
+                <h3 style="font-size: 1rem; color: white;">Log with MLflow</h3>
+                <p style="font-size: 0.85rem; color: rgba(255,255,255,0.6);">Models-from-code: no pickle, just source</p>
+              </div>
+            </div>
+            <div class="reveal-item" style="background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.1);">
+              <div class="icon-circle teal">&#x1F3E2;</div>
+              <div>
+                <h3 style="font-size: 1rem; color: white;">Register in Unity Catalog</h3>
+                <p style="font-size: 0.85rem; color: rgba(255,255,255,0.6);">Governed model versioning</p>
+              </div>
+            </div>
+            <div class="reveal-item" style="background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.1);">
+              <div class="icon-circle green">&#x1F512;</div>
+              <div>
+                <h3 style="font-size: 1rem; color: white;">Auto Service Principal</h3>
+                <p style="font-size: 0.85rem; color: rgba(255,255,255,0.6);">Credentials via <code style="color: rgba(255,255,255,0.8);">resources</code> param</p>
+              </div>
+            </div>
+            <div class="reveal-item" style="background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.1);">
+              <div class="icon-circle indigo">&#x1F3AE;</div>
+              <div>
+                <h3 style="font-size: 1rem; color: white;">AI Playground + Review App</h3>
+                <p style="font-size: 0.85rem; color: rgba(255,255,255,0.6);">Built-in testing &amp; feedback</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <span class="slide-num">05 / 19</span>
+  </section>
+
+  <!-- SLIDE 6: Model Serving: Deploy Pipeline -->
+  <section class="slide slide-teal" aria-label="Slide 6: Model Serving Deploy Pipeline">
+    <div class="slide-content">
+      <p class="section-label">Deploy Pipeline</p>
+      <h2 style="margin-bottom: 0.5rem;">Model Serving: Deploy Pipeline</h2>
+      <p class="subtitle" style="margin-bottom: 1.25rem;">From source code to live serving endpoint</p>
+      <div class="diagram" style="margin-bottom: 1.25rem;">
+        <div class="diagram-row" style="gap: 1rem;">
+          <div class="diagram-node outline" style="min-width: 140px;"><strong>src/agent.py</strong><br><span style="font-size: 0.7rem;">ResponsesAgent class</span></div>
+          <div class="diagram-arrow">&#x2192;</div>
+          <div class="diagram-node primary" style="min-width: 180px;"><strong>mlflow.pyfunc.log_model()</strong><br><span style="font-size: 0.7rem;">models-from-code</span></div>
+          <div class="diagram-arrow">&#x2192;</div>
+          <div class="diagram-node secondary" style="min-width: 150px;"><strong>Unity Catalog</strong><br><span style="font-size: 0.7rem;">registered model</span></div>
+          <div class="diagram-arrow">&#x2192;</div>
+          <div class="diagram-node green" style="min-width: 150px;"><strong>agents.deploy()</strong><br><span style="font-size: 0.7rem;">serving endpoint</span></div>
+        </div>
+      </div>
+      <div class="code-block" style="font-size: 0.72rem; max-width: 900px; margin: 0 auto;">
+<span class="comment"># notebooks/01_deploy_model_serving.py</span>
+<span class="keyword">import</span> mlflow
+<span class="keyword">from</span> databricks <span class="keyword">import</span> agents
+<span class="keyword">from</span> mlflow.models.resources <span class="keyword">import</span> DatabricksServingEndpoint
+
+<span class="comment"># Step 1: Log model (models-from-code — no pickle, just source)</span>
+model_info = mlflow.pyfunc.<span class="func">log_model</span>(
+    artifact_path=<span class="string">"agent"</span>,
+    python_model=<span class="string">"src/agent.py"</span>,          <span class="comment"># source file, not object</span>
+    registered_model_name=<span class="string">"catalog.schema.my_agent"</span>,
+    resources=[                              <span class="comment"># auto-provision SP access</span>
+        DatabricksServingEndpoint(endpoint_name=<span class="string">"databricks-claude-sonnet-4-6"</span>),
+    ],
+)
+
+<span class="comment"># Step 2: Deploy to serving endpoint (~15 min)</span>
+agents.<span class="func">deploy</span>(
+    model_name=<span class="string">"catalog.schema.my_agent"</span>,
+    model_version=model_info.registered_model_version,
+)</div>
+      <div style="display: flex; gap: 1.5rem; justify-content: center; margin-top: 1.25rem; flex-wrap: wrap;">
+        <div style="background: rgba(255,255,255,0.08); border-radius: 8px; padding: 0.6rem 1rem;">
+          <p style="font-family: var(--font-mono); font-size: 0.75rem; color: rgba(255,255,255,0.7);"><strong style="color: white;">resources=[]</strong> auto-provisions SP with "Can Query"</p>
+        </div>
+        <div style="background: rgba(255,255,255,0.08); border-radius: 8px; padding: 0.6rem 1rem;">
+          <p style="font-family: var(--font-mono); font-size: 0.75rem; color: rgba(255,255,255,0.7);"><strong style="color: white;">~15 min</strong> deploy time (cold start)</p>
+        </div>
+        <div style="background: rgba(255,255,255,0.08); border-radius: 8px; padding: 0.6rem 1rem;">
+          <p style="font-family: var(--font-mono); font-size: 0.75rem; color: rgba(255,255,255,0.7);"><strong style="color: white;">python_model=</strong> path string = models-from-code</p>
+        </div>
+      </div>
+    </div>
+    <span class="slide-num">06 / 19</span>
+  </section>
+
+  <!-- SLIDE 7: Databricks Apps: AgentServer -->
+  <section class="slide slide-light" aria-label="Slide 7: Databricks Apps AgentServer">
+    <div class="slide-content">
+      <p class="section-label">Deployment Path 2</p>
+      <h2 style="margin-bottom: 0.5rem;">Databricks Apps: AgentServer</h2>
+      <p class="subtitle" style="margin-bottom: 1.5rem;">@invoke / @stream decorators with full control</p>
+      <div class="two-col">
+        <div>
+          <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+            <div class="reveal-item">
+              <div class="icon-circle lava">&#x2699;</div>
+              <div>
+                <h3 style="font-size: 1rem;">AgentServer</h3>
+                <p style="font-size: 0.85rem; color: var(--text-secondary);">@invoke + @stream decorators, /invocations endpoint</p>
+              </div>
+            </div>
+            <div class="reveal-item">
+              <div class="icon-circle teal">&#x1F4C4;</div>
+              <div>
+                <h3 style="font-size: 1rem;">app.yaml Config</h3>
+                <p style="font-size: 0.85rem; color: var(--text-secondary);"><code>python main.py</code> — AgentServer handles uvicorn</p>
+              </div>
+            </div>
+            <div class="reveal-item">
+              <div class="icon-circle green">&#x1F464;</div>
+              <div>
+                <h3 style="font-size: 1rem;">OBO Authentication</h3>
+                <p style="font-size: 0.85rem; color: var(--text-secondary);">Runs as the calling user's identity</p>
+              </div>
+            </div>
+            <div class="reveal-item">
+              <div class="icon-circle indigo">&#x1F3A8;</div>
+              <div>
+                <h3 style="font-size: 1rem;">Custom UI</h3>
+                <p style="font-size: 0.85rem; color: var(--text-secondary);">React, Streamlit, Gradio — your choice</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div>
+          <div class="code-block" style="font-size: 0.72rem;">
+<span class="comment"># app/main.py — AgentServer with decorators</span>
+<span class="keyword">from</span> mlflow.genai.agent_server <span class="keyword">import</span> (
+    <span class="func">AgentServer</span>, <span class="func">invoke</span>, <span class="func">stream</span>,
+)
+
+<span class="func">@invoke</span>()
+<span class="keyword">def</span> <span class="func">handle_invoke</span>(request):
+    outputs = [e.item <span class="keyword">for</span> e <span class="keyword">in</span> handle_stream(request)
+        <span class="keyword">if</span> e.type == <span class="string">"response.output_item.done"</span>]
+    <span class="keyword">return</span> ResponsesAgentResponse(output=outputs)
+
+<span class="func">@stream</span>()
+<span class="keyword">def</span> <span class="func">handle_stream</span>(request):
+    msgs = to_chat_completions_input(...)
+    <span class="keyword">for</span> _, events <span class="keyword">in</span> graph.stream(...):
+        <span class="keyword">yield from</span> output_to_responses_items_stream(...)
+
+agent_server = <span class="func">AgentServer</span>(<span class="string">"ResponsesAgent"</span>)
+app = agent_server.app</div>
+        </div>
+      </div>
+    </div>
+    <span class="slide-num">07 / 19</span>
+  </section>
+
+  <!-- SLIDE 8: Databricks Apps: Deploy Pipeline -->
+  <section class="slide slide-dark" aria-label="Slide 8: Databricks Apps Deploy Pipeline">
+    <div class="slide-content">
+      <p class="section-label">Deploy Pipeline</p>
+      <h2 style="margin-bottom: 0.5rem;">Databricks Apps: Deploy Pipeline</h2>
+      <p class="subtitle" style="margin-bottom: 1.25rem;">From source code to running app with /invocations endpoint</p>
+      <div class="diagram" style="margin-bottom: 1.25rem;">
+        <div class="diagram-row" style="gap: 1rem;">
+          <div class="diagram-node outline" style="min-width: 150px;"><strong>app/main.py</strong><br><span style="font-size: 0.7rem;">AgentServer code</span></div>
+          <div class="diagram-arrow">&#x2192;</div>
+          <div class="diagram-node outline" style="min-width: 130px;"><strong>app.yaml</strong><br><span style="font-size: 0.7rem;">config + scopes</span></div>
+          <div class="diagram-arrow">&#x2192;</div>
+          <div class="diagram-node primary" style="min-width: 160px;"><strong>databricks apps create</strong><br><span style="font-size: 0.7rem;">provision app</span></div>
+          <div class="diagram-arrow">&#x2192;</div>
+          <div class="diagram-node green" style="min-width: 170px;"><strong>databricks apps deploy</strong><br><span style="font-size: 0.7rem;">/invocations live</span></div>
+        </div>
+      </div>
+      <div class="two-col" style="gap: 2rem;">
+        <div>
+          <h3 style="color: rgba(255,255,255,0.8); font-size: 0.95rem; margin-bottom: 0.5rem;">app.yaml</h3>
+          <div class="code-block" style="font-size: 0.72rem;">
+<span class="comment"># app.yaml — App configuration</span>
+command:
+  - <span class="string">"python"</span>
+  - <span class="string">"main.py"</span>
+
+env:
+  - name: <span class="string">DATABRICKS_HOST</span>
+    value: <span class="string">"{{.workspace_host}}"</span>
+  - name: <span class="string">LLM_ENDPOINT_NAME</span>
+    value: <span class="string">"databricks-claude-sonnet-4-6"</span>
+
+resources:
+  - name: <span class="string">serving-endpoint</span>
+    serving_endpoint: <span class="string">databricks-claude-sonnet-4-6</span>
+    permission: <span class="string">CAN_QUERY</span>
+
+user_api_scopes:
+  - <span class="string">sql</span>
+  - <span class="string">serving.serving-endpoints</span>
+  - <span class="string">files.files</span></div>
+        </div>
+        <div>
+          <h3 style="color: rgba(255,255,255,0.8); font-size: 0.95rem; margin-bottom: 0.5rem;">Deploy Commands</h3>
+          <div class="code-block" style="font-size: 0.72rem;">
+<span class="comment"># Create the app (one-time)</span>
+$ databricks apps create demo-agent-app
+
+<span class="comment"># Deploy source code (~5 min)</span>
+$ databricks apps deploy demo-agent-app \
+    --source-code-path app/
+
+<span class="comment"># Check status</span>
+$ databricks apps get demo-agent-app
+
+<span class="comment"># View logs</span>
+$ databricks apps logs demo-agent-app</div>
+          <div style="display: flex; gap: 1rem; margin-top: 0.75rem; flex-wrap: wrap;">
+            <div style="background: rgba(255,255,255,0.08); border-radius: 8px; padding: 0.5rem 0.75rem;">
+              <p style="font-family: var(--font-mono); font-size: 0.72rem; color: rgba(255,255,255,0.7);"><strong style="color: white;">~5 min</strong> deploy time</p>
+            </div>
+            <div style="background: rgba(255,255,255,0.08); border-radius: 8px; padding: 0.5rem 0.75rem;">
+              <p style="font-family: var(--font-mono); font-size: 0.72rem; color: rgba(255,255,255,0.7);"><strong style="color: white;">Hot reload</strong> on redeploy</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <span class="slide-num">08 / 19</span>
+  </section>
+
+  <!-- SLIDE 9: Auth: Model Serving -->
+  <section class="slide slide-ink" aria-label="Slide 9: Auth Model Serving">
+    <div class="slide-content">
+      <p class="section-label">Security</p>
+      <h2 style="margin-bottom: 0.5rem;">Auth: Model Serving</h2>
+      <p class="subtitle" style="margin-bottom: 1.25rem;">SystemAuthPolicy (auto SP) + UserAuthPolicy (OBO opt-in)</p>
+      <div class="two-col" style="gap: 2rem;">
+        <div>
+          <ul class="bullet-list" style="font-size: 0.88rem;">
+            <li style="color: white;"><strong>SystemAuthPolicy:</strong> Auto-provisioned SP via <code style="color: rgba(255,255,255,0.8);">resources</code> param in <code style="color: rgba(255,255,255,0.8);">log_model()</code></li>
+            <li style="color: white;">SP gets <strong>"Can Query"</strong> on each declared serving endpoint</li>
+            <li style="color: white;"><strong>UserAuthPolicy:</strong> OBO opt-in via <code style="color: rgba(255,255,255,0.8);">on_behalf_of_user=True</code> per resource</li>
+            <li style="color: white;">Uses <code style="color: rgba(255,255,255,0.8);">ModelServingUserCredentials</code> to obtain user token at runtime</li>
+            <li style="color: white;"><strong>Dual policies work together:</strong> system resources use SP, user-facing resources use OBO</li>
+            <li style="color: rgba(255,255,255,0.6);">Default: all requests run as the SP identity unless OBO is explicitly enabled</li>
+          </ul>
+          <div class="code-block" style="font-size: 0.7rem; margin-top: 0.75rem;">
+<span class="comment"># OBO opt-in per resource</span>
+resources=[
+    DatabricksServingEndpoint(
+        endpoint_name=<span class="string">"llm-endpoint"</span>),
+    DatabricksServingEndpoint(
+        endpoint_name=<span class="string">"user-endpoint"</span>,
+        on_behalf_of_user=<span class="keyword">True</span>),    <span class="comment"># OBO</span>
+]</div>
+        </div>
+        <div>
+          <div class="diagram">
+            <div class="diagram-node outline" style="min-width: 180px;">User Request</div>
+            <div class="diagram-connector"></div>
+            <div class="diagram-node secondary" style="min-width: 200px;">Serving Endpoint<br><span style="font-size: 0.7rem; opacity: 0.8;">agent code runs here</span></div>
+            <div class="diagram-connector"></div>
+            <div class="diagram-row" style="gap: 1.5rem;">
+              <div style="text-align: center;">
+                <div class="diagram-node accent" style="min-width: 140px;">System SP<br><span style="font-size: 0.7rem;">LLM, Vector Search</span></div>
+                <p style="font-size: 0.7rem; color: rgba(255,255,255,0.5); margin-top: 0.3rem;">SystemAuthPolicy</p>
+              </div>
+              <div style="text-align: center;">
+                <div class="diagram-node amber" style="min-width: 140px;">User OBO<br><span style="font-size: 0.7rem;">SQL, Tables</span></div>
+                <p style="font-size: 0.7rem; color: rgba(255,255,255,0.5); margin-top: 0.3rem;">UserAuthPolicy</p>
+              </div>
+            </div>
+          </div>
+          <div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 0.6rem 1rem; margin-top: 1rem;">
+            <p style="font-family: var(--font-mono); font-size: 0.72rem; color: rgba(255,255,255,0.7);">User &#x2192; Serving Endpoint &#x2192; Agent Code &#x2192; <strong style="color: #7ec8dc;">SP</strong> (system) / <strong style="color: var(--db-amber);">OBO</strong> (user)</p>
+          </div>
+        </div>
+      </div>
+    </div>
+    <span class="slide-num">09 / 19</span>
+  </section>
+
+  <!-- SLIDE 10: Auth: Databricks Apps -->
+  <section class="slide slide-white" aria-label="Slide 10: Auth Databricks Apps">
+    <div class="slide-content">
+      <p class="section-label">Security</p>
+      <h2 style="margin-bottom: 0.5rem;">Auth: Databricks Apps</h2>
+      <p class="subtitle" style="margin-bottom: 1.25rem;">X-Forwarded-Access-Token + OAuth consent + user_api_scopes</p>
+      <div class="two-col" style="gap: 2rem;">
+        <div>
+          <ul class="bullet-list" style="font-size: 0.88rem;">
+            <li>Platform injects <code>X-Forwarded-Access-Token</code> header per request</li>
+            <li><code>get_request_headers()</code> from AgentServer captures the token</li>
+            <li>Token creates <code>WorkspaceClient(token=forwarded_token)</code></li>
+            <li>Users see <strong>OAuth consent screen</strong> on first visit</li>
+            <li><strong>Dual auth:</strong> OBO for user resources, App SP for system resources</li>
+          </ul>
+          <h3 style="margin-top: 1rem; font-size: 0.95rem; color: var(--db-teal);">Required user_api_scopes</h3>
+          <div style="display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.5rem;">
+            <span class="badge badge-teal">sql</span>
+            <span class="badge badge-teal">serving.serving-endpoints</span>
+            <span class="badge badge-teal">dashboards.genie</span>
+            <span class="badge badge-teal">files.files</span>
+            <span class="badge badge-teal">catalog.tables:read</span>
+            <span class="badge badge-teal">vectorsearch.vector-search-indexes</span>
+          </div>
+        </div>
+        <div>
+          <div class="diagram">
+            <div class="diagram-node outline" style="min-width: 200px;">User (OAuth consent)<br><span style="font-size: 0.7rem;">first visit grants scopes</span></div>
+            <div class="diagram-connector"></div>
+            <div class="diagram-node green" style="min-width: 220px;">Databricks App<br><span style="font-size: 0.7rem; opacity: 0.8;">X-Forwarded-Access-Token</span></div>
+            <div class="diagram-connector"></div>
+            <div class="diagram-node accent" style="min-width: 220px;">get_request_headers()<br><span style="font-size: 0.7rem; opacity: 0.8;">extract token from header</span></div>
+            <div class="diagram-connector"></div>
+            <div class="diagram-row" style="gap: 1.5rem;">
+              <div class="diagram-node amber" style="min-width: 130px;">OBO User<br><span style="font-size: 0.7rem;">SQL, Tables</span></div>
+              <div class="diagram-node secondary" style="min-width: 130px;">App SP<br><span style="font-size: 0.7rem;">System resources</span></div>
+            </div>
+          </div>
+          <div class="code-block" style="font-size: 0.7rem; margin-top: 0.75rem;">
+<span class="comment"># Capture OBO token in handler</span>
+headers = <span class="func">get_request_headers</span>()
+token = headers[<span class="string">"X-Forwarded-Access-Token"</span>]
+client = <span class="func">WorkspaceClient</span>(token=token)</div>
+        </div>
+      </div>
+    </div>
+    <span class="slide-num">10 / 19</span>
+  </section>
+
+  <!-- SLIDE 11: Streaming Deep Dive -->
+  <section class="slide slide-teal" aria-label="Slide 11: Streaming Deep Dive">
+    <div class="slide-content">
+      <p class="section-label">Streaming</p>
+      <h2 style="margin-bottom: 0.5rem;">Streaming Deep Dive</h2>
+      <p class="subtitle" style="margin-bottom: 1.25rem;">Side-by-side: predict_stream vs @stream — same yield pattern, different wrappers</p>
+      <div class="comparison-grid" style="gap: 1.5rem;">
+        <div class="comparison-card left" style="padding: 1.25rem;">
+          <h3 style="color: #7ec8dc; margin-bottom: 0.75rem;">&#x2601; Model Serving <span class="badge badge-teal">predict_stream</span></h3>
+          <div class="code-block" style="font-size: 0.68rem;">
+<span class="keyword">class</span> <span class="func">MyAgent</span>(ResponsesAgent):
+    <span class="keyword">def</span> <span class="func">predict_stream</span>(self, request):
+        msgs = <span class="func">to_chat_completions_input</span>(
+            [i.model_dump()
+             <span class="keyword">for</span> i <span class="keyword">in</span> request.input])
+
+        <span class="keyword">for</span> _, events <span class="keyword">in</span> self.graph.stream(
+            {<span class="string">"messages"</span>: msgs},
+            stream_mode=[<span class="string">"updates"</span>]):
+            <span class="keyword">for</span> data <span class="keyword">in</span> events.values():
+                <span class="keyword">yield from</span> \
+                    <span class="func">output_to_responses_items_stream</span>(
+                        data[<span class="string">"messages"</span>])
+
+<span class="comment"># Yields: ResponsesAgentStreamEvent</span>
+<span class="comment"># Framework handles SSE conversion</span></div>
+        </div>
+        <div class="comparison-card right" style="padding: 1.25rem;">
+          <h3 style="color: #5cd6a8; margin-bottom: 0.75rem;">&#x1F4E6; Databricks Apps <span class="badge badge-green">@stream</span></h3>
+          <div class="code-block" style="font-size: 0.68rem;">
+<span class="func">@stream</span>()
+<span class="keyword">def</span> <span class="func">handle_stream</span>(request):
+    msgs = <span class="func">to_chat_completions_input</span>(
+        [i.model_dump()
+         <span class="keyword">for</span> i <span class="keyword">in</span> request.input])
+
+    <span class="keyword">for</span> _, events <span class="keyword">in</span> graph.stream(
+        {<span class="string">"messages"</span>: msgs},
+        stream_mode=[<span class="string">"updates"</span>]):
+        <span class="keyword">for</span> data <span class="keyword">in</span> events.values():
+            <span class="keyword">yield from</span> \
+                <span class="func">output_to_responses_items_stream</span>(
+                    data[<span class="string">"messages"</span>])
+
+<span class="comment"># Yields: ResponsesAgentStreamEvent</span>
+<span class="comment"># AgentServer handles SSE conversion</span></div>
+        </div>
+      </div>
+      <div style="display: flex; gap: 1.5rem; justify-content: center; margin-top: 1rem; flex-wrap: wrap;">
+        <div style="background: rgba(255,255,255,0.08); border-radius: 8px; padding: 0.6rem 1rem;">
+          <p style="font-family: var(--font-mono); font-size: 0.75rem; color: rgba(255,255,255,0.7);"><strong style="color: white;">Client:</strong> {"stream": true} in request body</p>
+        </div>
+        <div style="background: rgba(255,255,255,0.08); border-radius: 8px; padding: 0.6rem 1rem;">
+          <p style="font-family: var(--font-mono); font-size: 0.75rem; color: rgba(255,255,255,0.7);"><strong style="color: white;">Yield:</strong> ResponsesAgentStreamEvent objects</p>
+        </div>
+        <div style="background: rgba(255,255,255,0.08); border-radius: 8px; padding: 0.6rem 1rem;">
+          <p style="font-family: var(--font-mono); font-size: 0.75rem; color: rgba(255,255,255,0.7);"><strong style="color: white;">Wire:</strong> Server-Sent Events (SSE)</p>
+        </div>
+      </div>
+    </div>
+    <span class="slide-num">11 / 19</span>
+  </section>
+
+  <!-- SLIDE 12: MLflow Tracing -->
+  <section class="slide slide-light" aria-label="Slide 12: MLflow Tracing">
+    <div class="slide-content">
+      <p class="section-label">Observability</p>
+      <h2 style="margin-bottom: 1.25rem;">MLflow Tracing</h2>
+      <div class="comparison-grid">
+        <div class="comparison-card left">
+          <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem;">
+            <span class="badge badge-teal">Model Serving</span>
+            <span class="badge badge-green">AUTOMATIC</span>
+          </div>
+          <p style="margin-bottom: 1rem; font-size: 0.95rem;">Infrastructure handles everything. Traces appear in the linked MLflow experiment automatically.</p>
+          <div class="code-block" style="font-size: 0.75rem;">
+<span class="comment"># In src/agent.py — that's it!</span>
+<span class="keyword">import</span> mlflow
+mlflow.langchain.<span class="func">autolog</span>()
+
+<span class="comment"># ResponsesAgent.predict_stream()</span>
+<span class="comment"># auto-traces all LangGraph spans</span>
+<span class="comment"># to the serving endpoint's experiment</span></div>
+        </div>
+        <div class="comparison-card right">
+          <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem;">
+            <span class="badge badge-teal">Databricks Apps</span>
+            <span class="badge badge-amber">MANUAL SETUP</span>
+          </div>
+          <p style="margin-bottom: 1rem; font-size: 0.95rem;">You must explicitly configure the tracking URI, experiment, and autolog in app startup.</p>
+          <div class="code-block" style="font-size: 0.75rem;">
+<span class="comment"># In app/main.py — before AgentServer</span>
+<span class="keyword">import</span> mlflow
+
+<span class="comment"># Required: point to workspace MLflow</span>
+mlflow.<span class="func">set_tracking_uri</span>(<span class="string">"databricks"</span>)
+mlflow.<span class="func">set_experiment</span>(
+    <span class="string">"/Workspace/Shared/my-app"</span>
+)
+mlflow.langchain.<span class="func">autolog</span>()
+
+<span class="comment"># Then define @invoke, @stream, AgentServer</span></div>
+        </div>
+      </div>
+      <div style="margin-top: 1rem; padding: 1rem 1.25rem; background: var(--db-white); border: 1px solid var(--db-oat-medium); border-radius: 10px;">
+        <h3 style="font-size: 0.95rem; margin-bottom: 0.5rem;">UC-Based Trace Storage (Both Paths)</h3>
+        <div class="code-block" style="font-size: 0.72rem; margin: 0.5rem 0 0 0;">
+<span class="keyword">from</span> mlflow.tracing.destination <span class="keyword">import</span> <span class="func">UCSchemaLocation</span>, <span class="func">set_experiment_trace_location</span>
+
+location = <span class="func">UCSchemaLocation</span>(catalog_name=<span class="string">"my_catalog"</span>, schema_name=<span class="string">"my_schema"</span>)
+<span class="func">set_experiment_trace_location</span>(experiment_id=<span class="string">"12345"</span>, trace_location=location)
+<span class="comment"># Governed trace destinations — UC controls who can read traces</span></div>
+      </div>
+    </div>
+    <span class="slide-num">12 / 19</span>
+  </section>
+
+  <!-- SLIDE 13: Head-to-Head Comparison -->
+  <section class="slide slide-dark" aria-label="Slide 13: Head-to-Head Comparison">
+    <div class="slide-content">
+      <p class="section-label">Comparison</p>
+      <h2 style="margin-bottom: 1.25rem;">Head-to-Head</h2>
+      <table class="data-table" style="font-size: 0.88rem;">
+        <thead>
+          <tr>
+            <th class="col-feature">Feature</th>
+            <th>&#x2601; Model Serving</th>
+            <th>&#x1F4E6; Databricks Apps</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="col-feature">Agent Interface</td>
+            <td>ResponsesAgent class</td>
+            <td>@invoke / @stream decorators</td>
+          </tr>
+          <tr>
+            <td class="col-feature">API Format</td>
+            <td>Responses API (input/output)</td>
+            <td>Responses API (input/output)</td>
+          </tr>
+          <tr>
+            <td class="col-feature">Authentication</td>
+            <td>System SP (auto) + OBO opt-in</td>
+            <td class="green-text">OBO via X-Forwarded headers + App SP</td>
+          </tr>
+          <tr>
+            <td class="col-feature">Streaming</td>
+            <td class="green-text">predict_stream (built-in)</td>
+            <td class="green-text">@stream decorator (built-in)</td>
+          </tr>
+          <tr>
+            <td class="col-feature">MLflow Tracing</td>
+            <td class="green-text">Automatic</td>
+            <td>Manual setup required</td>
+          </tr>
+          <tr>
+            <td class="col-feature">Auto-scaling</td>
+            <td class="green-text">Yes (scale-to-zero)</td>
+            <td>Single instance</td>
+          </tr>
+          <tr>
+            <td class="col-feature">Custom UI</td>
+            <td>AI Playground only</td>
+            <td class="green-text">React, Streamlit, Gradio...</td>
+          </tr>
+          <tr>
+            <td class="col-feature">Custom Endpoints</td>
+            <td>Responses API only</td>
+            <td class="green-text">Extend AgentServer's FastAPI app</td>
+          </tr>
+          <tr>
+            <td class="col-feature">Deploy Time</td>
+            <td>~15 minutes</td>
+            <td class="green-text">~5 minutes</td>
+          </tr>
+          <tr>
+            <td class="col-feature">Iteration Speed</td>
+            <td>Slow (redeploy model)</td>
+            <td class="green-text">Fast (hot reload)</td>
+          </tr>
+          <tr>
+            <td class="col-feature">A/B Testing</td>
+            <td class="green-text">Native traffic splitting</td>
+            <td>Custom implementation</td>
+          </tr>
+          <tr>
+            <td class="col-feature">Cost Model</td>
+            <td>Pay-per-token + compute</td>
+            <td>Fixed compute cost</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <span class="slide-num">13 / 19</span>
+  </section>
+
+  <!-- SLIDE 14: When to Use Which -->
+  <section class="slide slide-light" aria-label="Slide 14: When to Use Which">
+    <div class="slide-content">
+      <p class="section-label">Decision Guide</p>
+      <h2 style="margin-bottom: 1.5rem;">When to Use Which</h2>
+      <div class="comparison-grid">
+        <div class="comparison-card" style="background: rgba(27,81,98,0.06); border: 1px solid rgba(27,81,98,0.15);">
+          <h3 style="color: var(--db-teal); margin-bottom: 1rem; font-size: 1.2rem;">&#x2601; Choose Model Serving</h3>
+          <ul class="bullet-list" style="font-size: 0.9rem;">
+            <li>Standard chat agents with OpenAI-compatible API</li>
+            <li>Production workloads requiring <strong>autoscaling</strong></li>
+            <li>When you want fully <strong>managed infrastructure</strong></li>
+            <li>Need <strong>A/B testing</strong> and traffic splitting</li>
+            <li>Review App for <strong>feedback collection</strong></li>
+            <li>Quick POC with minimal code</li>
+          </ul>
+        </div>
+        <div class="comparison-card" style="background: rgba(0,169,114,0.06); border: 1px solid rgba(0,169,114,0.15);">
+          <h3 style="color: var(--db-green); margin-bottom: 1rem; font-size: 1.2rem;">&#x1F4E6; Choose Databricks Apps</h3>
+          <ul class="bullet-list" style="font-size: 0.9rem;">
+            <li><strong>Custom UIs</strong> beyond a chat interface</li>
+            <li>Complex multi-step workflows with custom logic</li>
+            <li>Internal tools with <strong>per-user authorization</strong> (OBO)</li>
+            <li>Custom endpoints (extend AgentServer's FastAPI app)</li>
+            <li><strong>Rapid iteration</strong> during development</li>
+            <li>Full-stack apps (frontend + backend)</li>
+          </ul>
+        </div>
+      </div>
+      <div style="text-align: center; margin-top: 1.5rem; padding: 1.25rem; background: var(--db-white); border-radius: 10px; border: 1px solid var(--db-oat-medium);">
+        <p style="font-size: 0.95rem;"><strong>Pro tip:</strong> Start with <span style="color: var(--db-teal);">Model Serving</span> for your MVP, then migrate to <span style="color: var(--db-green);">Apps</span> when you need customization. Or use both: Model Serving as the agent backend, Apps as the custom frontend.</p>
+      </div>
+    </div>
+    <span class="slide-num">14 / 19</span>
+  </section>
+
+  <!-- SLIDE 15: Hybrid Architecture -->
+  <section class="slide slide-ink" aria-label="Slide 15: Hybrid Architecture">
+    <div class="slide-content">
+      <p class="section-label">Advanced Pattern</p>
+      <h2 style="margin-bottom: 0.5rem;">Hybrid Architecture</h2>
+      <p class="subtitle" style="margin-bottom: 1.25rem;">Model Serving as the agent backend + Databricks App as the custom frontend</p>
+      <div class="diagram" style="margin-bottom: 1.5rem;">
+        <div class="diagram-node outline" style="min-width: 200px;">End Users<br><span style="font-size: 0.7rem;">browser / mobile</span></div>
+        <div class="diagram-connector"></div>
+        <div class="diagram-node green" style="min-width: 280px;"><strong>Databricks App (Frontend)</strong><br><span style="font-size: 0.7rem; opacity: 0.8;">Custom UI | OBO auth | File upload | Admin dashboard</span></div>
+        <div class="diagram-connector"></div>
+        <div class="diagram-row" style="gap: 2rem;">
+          <div style="text-align: center;">
+            <div class="diagram-node primary" style="min-width: 200px;"><strong>Serving Endpoint A</strong><br><span style="font-size: 0.7rem; opacity: 0.8;">Agent v1 (70% traffic)</span></div>
+          </div>
+          <div style="text-align: center;">
+            <div class="diagram-node accent" style="min-width: 200px;"><strong>Serving Endpoint B</strong><br><span style="font-size: 0.7rem; opacity: 0.8;">Agent v2 (30% traffic)</span></div>
+          </div>
+        </div>
+        <div class="diagram-connector"></div>
+        <div class="diagram-row" style="gap: 1rem;">
+          <div class="diagram-node secondary" style="min-width: 120px;">FMAPI<br><span style="font-size: 0.7rem;">LLM</span></div>
+          <div class="diagram-node secondary" style="min-width: 120px;">Vector Search<br><span style="font-size: 0.7rem;">RAG</span></div>
+          <div class="diagram-node secondary" style="min-width: 120px;">UC Tables<br><span style="font-size: 0.7rem;">Data</span></div>
+        </div>
+      </div>
+      <div class="card-grid card-grid-3" style="gap: 1rem;">
+        <div class="card" style="padding: 1rem; text-align: center;">
+          <h3 style="color: white; font-size: 0.95rem;">Custom Chat UI</h3>
+          <p style="font-size: 0.8rem; color: rgba(255,255,255,0.6);">Rich frontend with file upload, history, admin panels</p>
+        </div>
+        <div class="card" style="padding: 1rem; text-align: center;">
+          <h3 style="color: white; font-size: 0.95rem;">A/B + Autoscaling</h3>
+          <p style="font-size: 0.8rem; color: rgba(255,255,255,0.6);">Serving handles traffic splitting and scale-to-zero</p>
+        </div>
+        <div class="card" style="padding: 1rem; text-align: center;">
+          <h3 style="color: white; font-size: 0.95rem;">Multi-Agent Orchestration</h3>
+          <p style="font-size: 0.8rem; color: rgba(255,255,255,0.6);">App routes to multiple specialized agent endpoints</p>
+        </div>
+      </div>
+    </div>
+    <span class="slide-num">15 / 19</span>
+  </section>
+
+  <!-- SLIDE 16: Apps - The Future -->
+  <section class="slide slide-dark" aria-label="Slide 16: Databricks Apps - The Future">
+    <div class="slide-content" style="text-align: center;">
+      <p class="section-label">Strategic Direction</p>
+      <h2 style="margin-bottom: 0.5rem;">Databricks Apps</h2>
+      <p style="font-size: clamp(1.3rem, 2.5vw, 1.8rem); font-weight: 400; color: rgba(255,255,255,0.7); margin-bottom: 2rem;">The Future of Agent Deployment</p>
+      <div class="card-grid card-grid-3" style="max-width: 1000px; margin: 0 auto;">
+        <div class="card" style="text-align: left;">
+          <div class="card-icon">&#x1F4C8;</div>
+          <h3 style="color: white; font-size: 1rem;">Horizontal Scaling</h3>
+          <p style="font-size: 0.85rem; color: rgba(255,255,255,0.6);">Multi-instance scaling on the roadmap for production workloads</p>
+        </div>
+        <div class="card" style="text-align: left;">
+          <div class="card-icon">&#x1F9E0;</div>
+          <h3 style="color: white; font-size: 1rem;">GPU Support</h3>
+          <p style="font-size: 0.85rem; color: rgba(255,255,255,0.6);">Run local models and inference directly in your app</p>
+        </div>
+        <div class="card" style="text-align: left;">
+          <div class="card-icon">&#x1F3D7;</div>
+          <h3 style="color: white; font-size: 1rem;">Full-Stack Apps</h3>
+          <p style="font-size: 0.85rem; color: rgba(255,255,255,0.6);">Build complete applications, not just chat endpoints</p>
+        </div>
+        <div class="card" style="text-align: left;">
+          <div class="card-icon">&#x1F464;</div>
+          <h3 style="color: white; font-size: 1rem;">OBO Multi-Tenant</h3>
+          <p style="font-size: 0.85rem; color: rgba(255,255,255,0.6);">True user-level governance and data isolation</p>
+        </div>
+        <div class="card" style="text-align: left;">
+          <div class="card-icon">&#x26A1;</div>
+          <h3 style="color: white; font-size: 1rem;">Fast Iteration</h3>
+          <p style="font-size: 0.85rem; color: rgba(255,255,255,0.6);">5-min deploy cycles vs 15-min model serving redeploys</p>
+        </div>
+        <div class="card" style="text-align: left;">
+          <div class="card-icon">&#x1F30D;</div>
+          <h3 style="color: white; font-size: 1rem;">App Templates</h3>
+          <p style="font-size: 0.85rem; color: rgba(255,255,255,0.6);">Growing ecosystem of community and Databricks templates</p>
+        </div>
+      </div>
+      <p style="margin-top: 2rem; color: rgba(255,255,255,0.5); font-size: 0.9rem;">Combine agents with dashboards, forms, file processing, and custom workflows — all governed by Unity Catalog</p>
+    </div>
+    <span class="slide-num">16 / 19</span>
+  </section>
+
+  <!-- SLIDE 17: Additional Considerations -->
+  <section class="slide slide-white" aria-label="Slide 17: Additional Considerations">
+    <div class="slide-content">
+      <p class="section-label">Things to Know</p>
+      <h2 style="margin-bottom: 1.5rem;">Additional Considerations</h2>
+      <div class="card-grid card-grid-2">
+        <div class="card">
+          <h3 style="margin-bottom: 0.5rem;">&#x1F504; A/B Testing</h3>
+          <p style="font-size: 0.9rem; color: var(--text-secondary);">Model Serving supports <strong>native traffic splitting</strong> between model versions. Apps require a custom routing layer.</p>
+        </div>
+        <div class="card">
+          <h3 style="margin-bottom: 0.5rem;">&#x1F3ED; Framework Flexibility</h3>
+          <p style="font-size: 0.9rem; color: var(--text-secondary);">AgentServer builds on FastAPI — extend its <code>app</code> object with custom routes, or use Streamlit/Gradio alongside.</p>
+        </div>
+        <div class="card">
+          <h3 style="margin-bottom: 0.5rem;">&#x1F3DB; Unity Catalog Governance</h3>
+          <p style="font-size: 0.9rem; color: var(--text-secondary);">Both paths integrate with UC. Model Serving uses UC model registry; Apps use UC for data access via OBO.</p>
+        </div>
+        <div class="card">
+          <h3 style="margin-bottom: 0.5rem;">&#x1F6E1; Rate Limiting</h3>
+          <p style="font-size: 0.9rem; color: var(--text-secondary);">Model Serving has <strong>built-in rate limiting</strong>. Apps need custom middleware (e.g., <code>slowapi</code>).</p>
+        </div>
+        <div class="card">
+          <h3 style="margin-bottom: 0.5rem;">&#x1F310; Static Assets</h3>
+          <p style="font-size: 0.9rem; color: var(--text-secondary);">Apps can serve <strong>HTML, CSS, JS, images</strong> — build rich interactive UIs alongside your agent.</p>
+        </div>
+        <div class="card">
+          <h3 style="margin-bottom: 0.5rem;">&#x1F500; Hybrid Approach</h3>
+          <p style="font-size: 0.9rem; color: var(--text-secondary);">Use Model Serving as the <strong>agent backend</strong> and an App as the <strong>custom frontend</strong> — best of both worlds.</p>
+        </div>
+      </div>
+    </div>
+    <span class="slide-num">17 / 19</span>
+  </section>
+
+  <!-- SLIDE 18: Live Demo Architecture -->
+  <section class="slide slide-teal" aria-label="Slide 18: Live Demo">
+    <div class="slide-content">
+      <p class="section-label">Code Walkthrough</p>
+      <h2 style="margin-bottom: 1.5rem;">Live Demo Architecture</h2>
+      <div class="diagram">
+        <div class="diagram-row" style="gap: 2rem;">
+          <div class="diagram-node secondary" style="min-width: 180px;">
+            <strong>src/</strong><br>
+            <span style="font-size: 0.75rem; opacity: 0.7;">Shared Agent Code</span>
+          </div>
+        </div>
+        <div style="display: flex; gap: 4rem; align-items: flex-start;">
+          <div class="diagram-connector"></div>
+          <div class="diagram-connector"></div>
+        </div>
+        <div class="diagram-row" style="gap: 3rem;">
+          <div style="text-align: center;">
+            <div class="diagram-node accent" style="min-width: 200px;">
+              <strong>notebooks/</strong><br>
+              <span style="font-size: 0.75rem; opacity: 0.8;">01_deploy_model_serving.py</span>
+            </div>
+            <div class="diagram-connector" style="margin: 0 auto;"></div>
+            <div class="diagram-node primary" style="min-width: 200px;">
+              &#x2601; Model Serving<br>
+              <span style="font-size: 0.7rem; opacity: 0.7;">SP auth | Auto tracing</span>
+            </div>
+          </div>
+          <div style="text-align: center;">
+            <div class="diagram-node outline" style="min-width: 200px;">
+              <strong>app/</strong><br>
+              <span style="font-size: 0.75rem; opacity: 0.8;">AgentServer + app.yaml</span>
+            </div>
+            <div class="diagram-connector" style="margin: 0 auto;"></div>
+            <div class="diagram-node green" style="min-width: 200px;">
+              &#x1F4E6; Databricks App<br>
+              <span style="font-size: 0.7rem; opacity: 0.7;">OBO auth | Manual tracing</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div style="display: flex; gap: 1rem; justify-content: center; margin-top: 1.5rem; flex-wrap: wrap;">
+        <div style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 0.75rem 1.25rem;">
+          <p style="font-family: var(--font-mono); font-size: 0.8rem; color: rgba(255,255,255,0.7);"><strong style="color: white;">src/agent.py</strong> — ResponsesAgent + LangGraph</p>
+        </div>
+        <div style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 0.75rem 1.25rem;">
+          <p style="font-family: var(--font-mono); font-size: 0.8rem; color: rgba(255,255,255,0.7);"><strong style="color: white;">src/tools.py</strong> — Product lookup + Calculator</p>
+        </div>
+        <div style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 0.75rem 1.25rem;">
+          <p style="font-family: var(--font-mono); font-size: 0.8rem; color: rgba(255,255,255,0.7);"><strong style="color: white;">app/main.py</strong> — AgentServer wrapper</p>
+        </div>
+      </div>
+    </div>
+    <span class="slide-num">18 / 19</span>
+  </section>
+
+  <!-- SLIDE 19: Q&A -->
+  <section class="slide slide-dark" aria-label="Slide 19: Q&A">
+    <div class="slide-content" style="text-align: center;">
+      <div style="margin-bottom: 2rem;">
+        <svg class="db-logo" viewBox="0 0 713 113" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Databricks" style="height: 32px;">
+        <g clip-path="url(#clip0_dark2)">
+        <path d="M98.9 46.5996L52.3 72.8996L2.4 44.7996L0 46.0996V66.4996L52.3 95.8996L98.9 69.6996V80.4996L52.3 106.8L2.4 78.6996L0 79.9996V83.4996L52.3 112.9L104.5 83.4996V63.0996L102.1 61.7996L52.3 89.7996L5.6 63.5996V52.7996L52.3 78.9996L104.5 49.5996V29.4996L101.9 27.9996L52.3 55.8996L8 31.0996L52.3 6.19961L88.7 26.6996L91.9 24.8996V22.3996L52.3 0.0996094L0 29.4996V32.6996L52.3 62.0996L98.9 35.7996V46.5996Z" fill="#FF3621"/>
+        <path d="M202.2 96.1994V6.39941H188.4V39.9994C188.4 40.4994 188.1 40.8994 187.6 41.0994C187.1 41.2994 186.6 41.0994 186.3 40.7994C181.6 35.2994 174.3 32.1994 166.3 32.1994C149.2 32.1994 135.8 46.5994 135.8 64.9994C135.8 73.9994 138.9 82.2994 144.6 88.3994C150.3 94.4994 158 97.7994 166.3 97.7994C174.2 97.7994 181.5 94.4994 186.3 88.7994C186.6 88.3994 187.2 88.2994 187.6 88.3994C188.1 88.5994 188.4 88.9994 188.4 89.4994V96.1994H202.2ZM169.3 85.2994C158.3 85.2994 149.7 76.3994 149.7 64.9994C149.7 53.5994 158.3 44.6994 169.3 44.6994C180.3 44.6994 188.9 53.5994 188.9 64.9994C188.9 76.3994 180.3 85.2994 169.3 85.2994Z" fill="white"/>
+        <path d="M276 96.0996V33.6996H262.3V39.9996C262.3 40.4996 262 40.8996 261.5 41.0996C261 41.2996 260.5 41.0996 260.2 40.6996C255.6 35.1996 248.4 32.0996 240.2 32.0996C223.1 32.0996 209.7 46.4996 209.7 64.8996C209.7 83.2996 223.1 97.6996 240.2 97.6996C248.1 97.6996 255.4 94.3996 260.2 88.5996C260.5 88.1996 261.1 88.0996 261.5 88.1996C262 88.3996 262.3 88.7996 262.3 89.2996V96.0996H276ZM243.3 85.2996C232.3 85.2996 223.7 76.3996 223.7 64.9996C223.7 53.5996 232.3 44.6996 243.3 44.6996C254.3 44.6996 262.9 53.5996 262.9 64.9996C262.9 76.3996 254.3 85.2996 243.3 85.2996Z" fill="white"/>
+        <path d="M314.4 97.1994C318.8 97.1994 322.7 96.7994 324.9 96.4994V84.4994C323.1 84.6994 319.9 84.8994 318 84.8994C312.4 84.8994 308.1 83.8994 308.1 71.7994V46.0994C308.1 45.3994 308.6 44.8994 309.3 44.8994H322.8V33.5994H309.3C308.6 33.5994 308.1 33.0994 308.1 32.3994V14.3994H294.3V32.4994C294.3 33.1994 293.8 33.6994 293.1 33.6994H283.5V44.9994H293.1C293.8 44.9994 294.3 45.4994 294.3 46.1994V75.2994C294.3 97.1994 308.9 97.1994 314.4 97.1994Z" fill="white"/>
+        <path d="M393.3 96.1996V33.6996H379.6V39.9996C379.6 40.4996 379.3 40.8996 378.8 41.0996C378.3 41.2996 377.8 41.0996 377.5 40.6996C372.9 35.1996 365.7 32.0996 357.5 32.0996C340.3 32.0996 327 46.4996 327 64.9996C327 83.4996 340.4 97.7996 357.5 97.7996C365.4 97.7996 372.7 94.4996 377.5 88.6996C377.8 88.2996 378.4 88.1996 378.8 88.2996C379.3 88.4996 379.6 88.8996 379.6 89.3996V96.1996H393.3ZM360.6 85.2996C349.6 85.2996 341 76.3996 341 64.9996C341 53.5996 349.6 44.6996 360.6 44.6996C371.6 44.6996 380.2 53.5996 380.2 64.9996C380.2 76.3996 371.6 85.2996 360.6 85.2996Z" fill="white"/>
+        <path d="M418.4 88.7994C418.5 88.7994 418.7 88.6994 418.8 88.6994C419.1 88.6994 419.5 88.8994 419.7 89.0994C424.4 94.5994 431.7 97.6994 439.7 97.6994C456.8 97.6994 470.2 83.2994 470.2 64.8994C470.2 55.8994 467.1 47.5994 461.4 41.4994C455.7 35.3994 448 32.0994 439.7 32.0994C431.8 32.0994 424.5 35.3994 419.7 41.0994C419.4 41.4994 418.9 41.5994 418.4 41.4994C417.9 41.2994 417.6 40.8994 417.6 40.3994V6.39941H403.8V96.1994H417.6V89.8994C417.6 89.3994 417.9 88.9994 418.4 88.7994ZM417 64.9994C417 53.5994 425.6 44.6994 436.6 44.6994C447.6 44.6994 456.2 53.5994 456.2 64.9994C456.2 76.3994 447.6 85.2994 436.6 85.2994C425.6 85.2994 417 76.2994 417 64.9994Z" fill="white"/>
+        <path d="M510.1 46.4994C511.4 46.4994 512.6 46.5994 513.4 46.7994V32.5994C512.9 32.4994 512 32.3994 511.1 32.3994C503.9 32.3994 497.3 36.0994 493.8 41.9994C493.5 42.4994 493 42.6994 492.5 42.4994C492 42.3994 491.6 41.8994 491.6 41.3994V33.6994H477.9V96.2994H491.7V68.6994C491.7 54.9994 498.7 46.4994 510.1 46.4994Z" fill="white"/>
+        <path d="M536.1 33.6992H522.1V96.2992H536.1V33.6992Z" fill="white"/>
+        <path d="M528.9 6.49902C524.2 6.49902 520.4 10.299 520.4 14.999C520.4 19.699 524.2 23.499 528.9 23.499C533.6 23.499 537.4 19.699 537.4 14.999C537.4 10.299 533.6 6.49902 528.9 6.49902Z" fill="white"/>
+        <path d="M577.1 32.0996C557.9 32.0996 544 45.8996 544 64.9996C544 74.2996 547.3 82.5996 553.2 88.5996C559.2 94.5996 567.6 97.8996 577 97.8996C584.8 97.8996 590.8 96.3996 602.2 87.9996L594.3 79.6996C588.7 83.3996 583.5 85.1996 578.4 85.1996C566.8 85.1996 558.1 76.4996 558.1 64.9996C558.1 53.4996 566.8 44.7996 578.4 44.7996C583.9 44.7996 589 46.5996 594.1 50.2996L602.9 41.9996C592.6 33.1996 583.3 32.0996 577.1 32.0996Z" fill="white"/>
+        <path d="M626.5 68.699C626.7 68.499 627 68.399 627.3 68.399H627.4C627.7 68.399 628 68.599 628.3 68.799L650.4 96.199H667.4L638.8 61.599C638.4 61.099 638.4 60.399 638.9 59.999L665.2 33.699H648.3L625.6 56.499C625.3 56.799 624.8 56.899 624.3 56.799C623.9 56.599 623.6 56.199 623.6 55.699V6.49902H609.7V96.299H623.5V71.899C623.5 71.599 623.6 71.199 623.9 70.999L626.5 68.699Z" fill="white"/>
+        <path d="M689.9 97.799C701.2 97.799 712.7 90.899 712.7 77.799C712.7 69.199 707.3 63.299 696.3 59.699L688.8 57.199C683.7 55.499 681.3 53.099 681.3 49.799C681.3 45.999 684.7 43.399 689.5 43.399C694.1 43.399 698.2 46.399 700.8 51.599L711.9 45.599C707.8 37.199 699.3 31.999 689.5 31.999C677.1 31.999 668.1 39.999 668.1 50.899C668.1 59.599 673.3 65.399 684 68.799L691.7 71.299C697.1 72.999 699.4 75.199 699.4 78.699C699.4 83.999 694.5 85.899 690.3 85.899C684.7 85.899 679.7 82.299 677.3 76.399L666 82.399C669.7 91.899 678.8 97.799 689.9 97.799Z" fill="white"/>
+        </g>
+        <defs><clipPath id="clip0_dark2"><rect width="712.8" height="113" fill="white"/></clipPath></defs>
+        </svg>
+      </div>
+      <h1 style="margin-bottom: 1rem; font-size: clamp(2rem, 4vw, 3.5rem);">Questions &amp; Discussion</h1>
+      <div class="accent-line" style="margin: 1rem auto;"></div>
+      <p style="font-size: 1.1rem; color: rgba(255,255,255,0.65); max-width: 600px; margin: 1rem auto;">Let's discuss which deployment path fits your use case</p>
+      <div style="margin-top: 2.5rem; display: flex; gap: 2rem; justify-content: center; flex-wrap: wrap;">
+        <div style="background: rgba(255,255,255,0.08); border-radius: 8px; padding: 0.75rem 1.5rem;">
+          <p style="font-family: var(--font-mono); font-size: 0.85rem; color: rgba(255,255,255,0.7);">Code: <strong style="color: white;">github.com/.../agent-on-apps</strong></p>
+        </div>
+        <div style="background: rgba(255,255,255,0.08); border-radius: 8px; padding: 0.75rem 1.5rem;">
+          <p style="font-family: var(--font-mono); font-size: 0.85rem; color: rgba(255,255,255,0.7);">Docs: <strong style="color: white;">docs.databricks.com/apps</strong></p>
+        </div>
+      </div>
+    </div>
+    <span class="slide-num">19 / 19</span>
+  </section>
+
+  <script>
+    class SlidePresentation {
+      constructor() {
+        this.slides = document.querySelectorAll('.slide');
+        this.progressBar = document.querySelector('.progress-bar');
+        this.navDots = document.querySelector('.nav-dots');
+        this.currentSlide = 0;
+        this.init();
+      }
+      init() { this.createNavDots(); this.setupIntersectionObserver(); this.setupKeyboardNav(); this.setupTouchNav(); this.setupWheelNav(); this.updateProgress(); }
+      createNavDots() { this.slides.forEach((_, i) => { const dot = document.createElement('button'); dot.className = 'nav-dot' + (i === 0 ? ' active' : ''); dot.setAttribute('aria-label', `Go to slide ${i + 1}`); dot.addEventListener('click', () => this.goToSlide(i)); this.navDots.appendChild(dot); }); }
+      setupIntersectionObserver() { const observer = new IntersectionObserver((entries) => { entries.forEach(entry => { if (entry.isIntersecting) { entry.target.classList.add('visible'); const index = [...this.slides].indexOf(entry.target); this.currentSlide = index; this.updateDots(); this.updateProgress(); this.animateCounters(entry.target); } }); }, { threshold: 0.5 }); this.slides.forEach(slide => observer.observe(slide)); }
+      animateCounters(slide) { slide.querySelectorAll('.counter-value[data-target]:not(.counted)').forEach(el => { el.classList.add('counted'); const target = parseInt(el.dataset.target); const suffix = el.dataset.suffix || ''; const prefix = el.dataset.prefix || ''; const duration = 1500; const start = performance.now(); const animate = (now) => { const progress = Math.min((now - start) / duration, 1); const eased = 1 - Math.pow(1 - progress, 3); el.textContent = prefix + Math.round(target * eased).toLocaleString() + suffix; if (progress < 1) requestAnimationFrame(animate); }; requestAnimationFrame(animate); }); }
+      setupKeyboardNav() { document.addEventListener('keydown', (e) => { if (e.key === 'ArrowDown' || e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); this.goToSlide(this.currentSlide + 1); } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') { e.preventDefault(); this.goToSlide(this.currentSlide - 1); } }); }
+      setupTouchNav() { let startY = 0; document.addEventListener('touchstart', (e) => { startY = e.touches[0].clientY; }, { passive: true }); document.addEventListener('touchend', (e) => { const diff = startY - e.changedTouches[0].clientY; if (Math.abs(diff) > 50) { this.goToSlide(this.currentSlide + (diff > 0 ? 1 : -1)); } }, { passive: true }); }
+      setupWheelNav() { let lastScroll = 0; document.addEventListener('wheel', (e) => { const now = Date.now(); if (now - lastScroll < 800) return; lastScroll = now; this.goToSlide(this.currentSlide + (e.deltaY > 0 ? 1 : -1)); }, { passive: true }); }
+      goToSlide(index) { const target = Math.max(0, Math.min(index, this.slides.length - 1)); this.slides[target].scrollIntoView({ behavior: 'instant' }); }
+      updateDots() { this.navDots.querySelectorAll('.nav-dot').forEach((dot, i) => { dot.classList.toggle('active', i === this.currentSlide); }); }
+      updateProgress() { const pct = ((this.currentSlide + 1) / this.slides.length) * 100; this.progressBar.style.width = pct + '%'; this.progressBar.setAttribute('aria-valuenow', Math.round(pct)); }
+    }
+    new SlidePresentation();
+  </script>
+</body>
+</html>

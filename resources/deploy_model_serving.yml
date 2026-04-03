@@ -1,0 +1,39 @@
+# Job: Deploy LangGraph agent to Model Serving
+#
+# Runs notebook 01 which:
+#   1. Tests the agent locally
+#   2. Logs the ResponsesAgent model with MLflow (models-from-code)
+#   3. Registers in Unity Catalog
+#   4. Deploys to a Model Serving endpoint via agents.deploy()
+#
+# The notebook uses serverless compute (no cluster config needed).
+
+resources:
+  jobs:
+    deploy_model_serving:
+      name: "[${bundle.target}] Deploy Agent to Model Serving"
+      tasks:
+        - task_key: deploy_to_serving
+          notebook_task:
+            notebook_path: ../notebooks/01_deploy_model_serving.py
+            base_parameters:
+              catalog: ${var.catalog}
+              schema: ${var.schema}
+              model_name: ${var.model_name}
+              llm_endpoint: ${var.llm_endpoint}
+          # Serverless compute -- no cluster definition needed
+          environment_key: default
+      environments:
+        - environment_key: default
+          spec:
+            environment_version: "5"
+            dependencies:
+              - mlflow[genai]>=3.10.1
+              - langchain>=1.2.13
+              - langgraph>=1.1.3
+              - databricks-langchain
+              - databricks-agents
+              - databricks-sdk>=0.102.0
+      tags:
+        project: agent-on-apps
+        deployment_path: model-serving
