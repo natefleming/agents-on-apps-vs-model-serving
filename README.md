@@ -1,5 +1,7 @@
 # Agent on Apps: Model Serving vs Databricks Apps
 
+> **[View the Presentation: Deploying AI Agents on Databricks](https://natefleming.github.io/agents-on-apps-vs-model-serving/presentation/model-serving-vs-apps.html)** — An interactive slide deck comparing Model Serving and Databricks Apps as deployment targets for LangGraph agents.
+
 Demo project comparing two deployment paths for the same LangGraph agent on Databricks.
 
 ## Project Structure
@@ -92,8 +94,3 @@ databricks apps deploy demo-agent-app --source-code-path app/ --profile DEFAULT
 | Deploy Time | ~15 min | ~5 min |
 | Cost Model | Pay-per-token | Fixed compute |
 
-## Presentation
-
-The slide deck is available here: [Model Serving vs Apps](presentation/model-serving-vs-apps.html)
-
-Open in any browser. Navigate with arrow keys, scroll, or click the nav dots.
